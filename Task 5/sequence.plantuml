@@ -1,0 +1,54 @@
+@startuml
+title Sequence Diagram: Чтение списка заказов и запись изменения статуса заказа (Write-Through)
+
+participant "Пользователь" as User
+participant "Внутренний компоненты системы" as System
+participant "MES API" as API
+participant "Cache (Redis)" as Cache
+participant "MES DB" as DB
+
+== Чтение списка заказов ==
+
+User -> API: Запрос списка заказов
+activate API
+
+API -> Cache: get(ключ списка заказов)
+activate Cache
+
+alt Данные в кеше
+    Cache --> API: Список заказов (cache hit)
+    deactivate Cache
+else Данные отсутствуют
+    Cache --> API: null (cache miss)
+    deactivate Cache
+    API -> DB: Запрос списка заказов
+    activate DB
+    DB --> API: Список заказов
+    deactivate DB
+    API -> Cache: set(ключ списка заказов, список заказов)
+    activate Cache
+    Cache --> API: OK
+    deactivate Cache
+end
+
+API --> User: Список заказов
+deactivate API
+
+== Запись об изменении статуса заказа ==
+
+System -> API: Запрос на изменение статуса заказа
+activate API
+
+API -> Cache: set(ключ заказа, данные заказа с новым статусом)
+activate Cache
+Cache -> DB: Запись данных заказа с новым статусом
+activate DB
+DB --> Cache: OK
+deactivate DB
+Cache --> API: OK
+deactivate Cache
+
+API --> System: OK
+deactivate API
+
+@enduml
